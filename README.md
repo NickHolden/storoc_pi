@@ -42,3 +42,9 @@ Note - if trying to run this step on a different machine than raspberry pi a dif
 
 
 
+### Example command for people_counter.py
+
+```bash
+python3 people_counter.py --prototxt mobilenet_ssd/MobileNetSSD_deploy.prototxt --model mobilenet_ssd/MobileNetSSD_deploy.caffemodel --input testvid2.avi --output output1.avi
+```
+
