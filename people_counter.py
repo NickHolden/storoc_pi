@@ -1,6 +1,3 @@
-########################################
-###### DOESN'T WORK PROPERLY YET  ######
-########################################
 # Adapted from https://www.pyimagesearch.com/2018/08/13/opencv-people-counter/
 
 # import the necessary packages
@@ -14,6 +11,7 @@ import imutils
 import time
 import dlib
 import cv2
+import requests
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
@@ -25,12 +23,12 @@ ap.add_argument("-i", "--input", type=str,
 	help="path to optional input video file")
 ap.add_argument("-o", "--output", type=str,
 	help="path to optional output video file")
-ap.add_argument("-c", "--confidence", type=float, default=0.4,
+ap.add_argument("-c", "--confidence", type=float, default=0.1,
 	help="minimum probability to filter weak detections")
 ap.add_argument("-s", "--skip-frames", type=int, default=30,
 	help="# of skip frames between detections")
 args = vars(ap.parse_args())
-
+API_ENDPOINT = "http://52.168.148.0/api"
 # initialize the list of class labels MobileNet SSD was trained to
 # detect
 CLASSES = ["background", "aeroplane", "bicycle", "bird", "boat",
@@ -84,6 +82,10 @@ while True:
 	frame = vs.read()
 	frame = frame[1] if args.get("input", False) else frame
 
+	# preprocess adjusting brightness for more accuracy
+	brt = 40
+	frame[frame < 255 - brt] += brt
+
 	# if we are viewing a video and we did not grab a frame then we
 	# have reached the end of the video
 	if args["input"] is not None and frame is None:
@@ -130,7 +132,6 @@ while True:
 			# extract the confidence (i.e., probability) associated
 			# with the prediction
 			confidence = detections[0, 0, i, 2]
-
 			# filter out weak detections by requiring a minimum
 			# confidence
 			if confidence > args["confidence"]:
@@ -183,6 +184,9 @@ while True:
 	# draw a horizontal line in the center of the frame -- once an
 	# object crosses this line we will determine whether they were
 	# moving 'up' or 'down'
+
+	# draws a line from pt1 to pt2 in the image.
+	#        frame  pt1           pt2          line color    thickness
 	cv2.line(frame, (0, H // 2), (W, H // 2), (0, 255, 255), 2)
 
 	# use the centroid tracker to associate the (1) old object
@@ -215,14 +219,14 @@ while True:
 				# if the direction is negative (indicating the object
 				# is moving up) AND the centroid is above the center
 				# line, count the object
-				if direction < 0 and centroid[1] < H // 2:
+				if direction > 0 and centroid[1] < H // 2:
 					totalUp += 1
 					to.counted = True
 
 				# if the direction is positive (indicating the object
 				# is moving down) AND the centroid is below the
 				# center line, count the object
-				elif direction > 0 and centroid[1] > H // 2:
+				elif direction < 0 and centroid[1] > H // 2:
 					totalDown += 1
 					to.counted = True
 
@@ -265,6 +269,11 @@ while True:
 	# increment the total number of frames processed thus far and
 	# then update the FPS counter
 	totalFrames += 1
+	if totalFrames % 60 == 0:
+		occupancy = totalUp - totalDown
+		data = {'unique_id': 'ChIJ82TJ8MaxPIgRGd8xSBhWo54',
+				'current_occupancy': occupancy}
+		requests.post(url=API_ENDPOINT, json=data)
 	fps.update()
 
 # stop the timer and display FPS information
