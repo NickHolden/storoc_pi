@@ -147,7 +147,6 @@ while True:
 				# for the object
 				box = detections[0, 0, i, 3:7] * np.array([W, H, W, H])
 				(startX, startY, endX, endY) = box.astype("int")
-
 				# construct a dlib rectangle object from the bounding
 				# box coordinates and then start the dlib correlation
 				# tracker
@@ -180,6 +179,8 @@ while True:
 
 			# add the bounding box coordinates to the rectangles list
 			rects.append((startX, startY, endX, endY))
+			print("rects: ", rects)
+			print("type rects: ", type(rects))
 
 	# draw a horizontal line in the center of the frame -- once an
 	# object crosses this line we will determine whether they were
@@ -192,6 +193,8 @@ while True:
 	# use the centroid tracker to associate the (1) old object
 	# centroids with (2) the newly computed object centroids
 	objects = ct.update(rects)
+	print("objects: ", objects)
+	print("type objects: ", type(objects))
 
 	# loop over the tracked objects
 	for (objectID, centroid) in objects.items():
@@ -269,11 +272,11 @@ while True:
 	# increment the total number of frames processed thus far and
 	# then update the FPS counter
 	totalFrames += 1
-	if totalFrames % 60 == 0:
-		occupancy = totalUp - totalDown
-		data = {'unique_id': 'ChIJ82TJ8MaxPIgRGd8xSBhWo54',
-				'current_occupancy': occupancy}
-		requests.post(url=API_ENDPOINT, json=data)
+	# if totalFrames % 60 == 0:
+	# 	occupancy = totalUp - totalDown
+	# 	data = {'unique_id': 'ChIJ82TJ8MaxPIgRGd8xSBhWo54',
+	# 			'current_occupancy': occupancy}
+	# 	requests.post(url=API_ENDPOINT, json=data)
 	fps.update()
 
 # stop the timer and display FPS information
