@@ -1,7 +1,4 @@
 ######## Webcam Object Detection Using Tensorflow-trained Classifier #########
-#
-# Author: Evan Juras
-# Date: 10/2/19
 # Description:
 # This program uses a TensorFlow Lite model to perform object detection on a
 # video. It draws boxes and scores around the objects of interest in each frame
@@ -19,7 +16,7 @@ import cv2
 import numpy as np
 import sys
 import imutils
-
+import requests
 import importlib.util
 from tflite_runtime.interpreter import Interpreter
 from pyimagesearch.centroidtracker import CentroidTracker
@@ -44,7 +41,7 @@ GRAPH_NAME = args.graph
 LABELMAP_NAME = args.labels
 VIDEO_NAME = args.video
 min_conf_threshold = float(args.threshold)
-
+API_ENDPOINT = "https://storoc.live/api"
 # Get path to current working directory
 CWD_PATH = os.getcwd()
 
@@ -87,8 +84,9 @@ input_std = 127.5
 video = cv2.VideoCapture(VIDEO_PATH)
 imW = video.get(cv2.CAP_PROP_FRAME_WIDTH)
 imH = video.get(cv2.CAP_PROP_FRAME_HEIGHT)
+print("image width:",imW, "image height:", imH)
 
-
+previous_occupancy_sent = 0
 
 ct = CentroidTracker()
 trackers = []
@@ -126,32 +124,34 @@ while (video.isOpened()):
 
     # Loop over all detections and draw detection box if confidence is above minimum threshold
     for i in range(len(scores)):
-        if ((labels[int(classes[i])] == 'person') and ((scores[i] > min_conf_threshold) and (scores[i] <= 1.0))):
+        if ((labels[int(classes[i])] == 'person')):
+            print('detected person with confidence:',scores[i])
+            if ((scores[i] > min_conf_threshold) and (scores[i] <= 1.0)):
             # Get bounding box coordinates and draw box
             # Interpreter can return coordinates that are outside of image dimensions, need to force them to be within image using max() and min()
-            ymin = int(max(1, (boxes[i][0] * imH))); xmin = int(max(1, (boxes[i][1] * imW))); ymax = int(min(imH, (boxes[i][2] * imH))); xmax = int(min(imW, (boxes[i][3] * imW)))
-            rects.append((xmin, ymin, xmax, ymax))
+                ymin = int(max(1, (boxes[i][0] * imH))); xmin = int(max(1, (boxes[i][1] * imW))); ymax = int(min(imH, (boxes[i][2] * imH))); xmax = int(min(imW, (boxes[i][3] * imW)))
+                rects.append((xmin, ymin, xmax, ymax))
             # print("rects: ", rects)
             # print("type rects: ", type(rects))
-            midpoint = (int((xmin+xmax)/2), int((ymin+ymax)/2))
-            cv2.circle(frame, midpoint, 5, (75, 13, 180), -1)
+                midpoint = (int((xmin+xmax)/2), int((ymin+ymax)/2))
+            # cv2.circle(frame, midpoint, 5, (75, 13, 180), -1)
 
             # cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (10, 255, 0), 4)
 
             # Draw label
-            object_name = labels[int(classes[i])]  # Look up object name from "labels" array using class index
-            label = '%s: %d%%' % (object_name, int(scores[i] * 100))  # Example: 'person: 72%'
-            labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)  # Get font size
-            label_ymin = max(ymin, labelSize[1] + 10)  # Make sure not to draw label too close to top of window
-            cv2.rectangle(frame, (xmin, label_ymin - labelSize[1] - 10),
+                object_name = labels[int(classes[i])]  # Look up object name from "labels" array using class index
+                label = '%s: %d%%' % (object_name, int(scores[i] * 100))  # Example: 'person: 72%'
+                labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)  # Get font size
+                label_ymin = max(ymin, labelSize[1] + 10)  # Make sure not to draw label too close to top of window
+                cv2.rectangle(frame, (xmin, label_ymin - labelSize[1] - 10),
                           (xmin + labelSize[0], label_ymin + baseLine - 10), (255, 255, 255),
                           cv2.FILLED)  # Draw white box to put label text in
-            cv2.putText(frame, label, (xmin, label_ymin - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0),
+                cv2.putText(frame, label, (xmin, label_ymin - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0),
                         2)  # Draw label text
     objects = ct.update(rects)
     # print("objects: ", objects)
     # print("type objects: ", type(objects))
-    cv2.line(frame, (0, H // 2), (W, H // 2), (0, 255, 255), 2)
+    # cv2.line(frame, (0, H // 2), (W, H // 2), (0, 255, 255), 2)
     for (objectID, centroid) in objects.items():
         # check to see if a trackable object exists for the current
         # object ID
@@ -171,13 +171,18 @@ while (video.isOpened()):
             y = [c[1] for c in to.centroids]
             direction = centroid[1] - np.mean(y)
             to.centroids.append(centroid)
-            print("Traveling in direction: ", direction)
+            print("Traveling in direction:", direction)
+            print("Centroid[1]:", centroid[1])
             if not to.counted:
-                if direction > 0 and centroid[1] > height // 2:
-                    total_in += 1
-                    to.counted = True
-                elif direction < 0 and centroid[1] < height // 2:
+                #if centroid[1] > height // 2:#direction > 0: # and centroid[1] < height // 2:
+                #if direction > 0 and centroid[1] > 250:
+                if centroid[1] > 250:
                     total_out += 1
+                    to.counted = True
+                #elif centroid[1] < height // 2:# direction < 0: # and centroid[1] > height // 2:
+                #elif direction < 0 and centroid[1] < 250:
+                elif centroid[1] < 250:
+                    total_in += 1
                     to.counted = True
         # store the trackable object in our dictionary
         trackableObjects[objectID] = to
@@ -198,11 +203,18 @@ while (video.isOpened()):
         cv2.putText(frame, text, (10, height - ((i * 20) + 20)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
     cv2.imshow('Object detector', frame)
-
+    fps.update()
+    occupancy = total_in - total_out
+    if occupancy != previous_occupancy_sent and occupancy >= 0:
+        data = {'unique_id': 'ChIJ82TJ8MaxPIgRGd8xSBhWo54', 'current_occupancy': occupancy}
+        requests.post(url=API_ENDPOINT, json=data)
+        previous_occupancy_sent = occupancy
     # Press 'q' to quit
     if cv2.waitKey(1) == ord('q'):
         break
-
+fps.stop()
+print("[INFO] elasped time: {:.2f}".format(fps.elapsed()))
+print("[INFO] approx. FPS: {:.2f}".format(fps.fps()))
 # Clean up
 video.release()
 cv2.destroyAllWindows()

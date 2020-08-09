@@ -4,7 +4,7 @@ from collections import OrderedDict
 import numpy as np
 
 class CentroidTracker:
-	def __init__(self, maxDisappeared=50, maxDistance=50):
+	def __init__(self, maxDisappeared=10, maxDistance=100):
 		# initialize the next unique object ID along with two ordered
 		# dictionaries used to keep track of mapping a given object
 		# ID to its centroid and number of consecutive frames it has
@@ -115,6 +115,7 @@ class CentroidTracker:
 				# the maximum distance, do not associate the two
 				# centroids to the same object
 				if D[row, col] > self.maxDistance:
+					print("Distance between these centroids is greater than the max distance.", D[row, col])
 					continue
 
 				# otherwise, grab the object ID for the current row,
